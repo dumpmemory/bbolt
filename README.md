@@ -1,10 +1,8 @@
 bbolt
 =====
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/etcd-io/bbolt?style=flat-square)](https://goreportcard.com/report/github.com/etcd-io/bbolt)
-[![Coverage](https://codecov.io/gh/etcd-io/bbolt/branch/master/graph/badge.svg)](https://codecov.io/gh/etcd-io/bbolt)
-[![Build Status Travis](https://img.shields.io/travis/etcd-io/bboltlabs.svg?style=flat-square&&branch=master)](https://travis-ci.com/etcd-io/bbolt)
-[![Godoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/etcd-io/bbolt)
+[![Go Report Card](https://goreportcard.com/badge/go.etcd.io/bbolt?style=flat-square)](https://goreportcard.com/report/go.etcd.io/bbolt)
+[![Go Reference](https://pkg.go.dev/badge/go.etcd.io/bbolt.svg)](https://pkg.go.dev/go.etcd.io/bbolt)
 [![Releases](https://img.shields.io/github/release/etcd-io/bbolt/all.svg?style=flat-square)](https://github.com/etcd-io/bbolt/releases)
 [![LICENSE](https://img.shields.io/github/license/etcd-io/bbolt.svg?style=flat-square)](https://github.com/etcd-io/bbolt/blob/master/LICENSE)
 
@@ -103,7 +101,7 @@ To use bbolt as an embedded key-value store, import as:
 ```go
 import bolt "go.etcd.io/bbolt"
 
-db, err := bolt.Open(path, 0666, nil)
+db, err := bolt.Open(path, 0600, nil)
 if err != nil {
   return err
 }
@@ -298,6 +296,17 @@ db.Update(func(tx *bolt.Tx) error {
 })
 ```
 
+You can retrieve an existing bucket using the `Tx.Bucket()` function:
+```go
+db.Update(func(tx *bolt.Tx) error {
+	b := tx.Bucket([]byte("MyBucket"))
+	if b == nil {
+		return fmt.Errorf("bucket does not exist")
+	}
+	return nil
+})
+```
+
 You can also create a bucket only if it doesn't exist by using the
 `Tx.CreateBucketIfNotExists()` function. It's a common pattern to call this
 function for all your top-level buckets after you open your database so you can
@@ -336,7 +345,17 @@ exists then it will return its byte slice value. If it doesn't exist then it
 will return `nil`. It's important to note that you can have a zero-length value
 set to a key which is different than the key not existing.
 
-Use the `Bucket.Delete()` function to delete a key from the bucket.
+Use the `Bucket.Delete()` function to delete a key from the bucket:
+
+```go
+db.Update(func (tx *bolt.Tx) error {
+    b := tx.Bucket([]byte("MyBucket"))
+    err := b.Delete([]byte("answer"))
+    return err
+})
+```
+
+This will delete the key `answers` from the bucket `MyBucket`.
 
 Please note that values returned from `Get()` are only valid while the
 transaction is open. If you need to use a value outside of the transaction
@@ -425,6 +444,11 @@ When you have iterated to the end of the cursor then `Next()` will return a
 `nil` key.  You must seek to a position using `First()`, `Last()`, or `Seek()`
 before calling `Next()` or `Prev()`. If you do not seek to a position then
 these functions will return a `nil` key.
+
+If you remove key/value pairs during iteration, the cursor may automatically
+move to the next position if present in current node each time removing a key.
+When you call `c.Next()` after removing a key, it may skip one key/value pair.  
+Refer to [pull/611](https://github.com/etcd-io/bbolt/pull/611) to get more detailed info.
 
 During iteration, if the key is non-`nil` but the value is `nil`, that means
 the key refers to a bucket rather than a value.  Use `Bucket.Bucket()` to
@@ -645,7 +669,7 @@ uses a shared lock to allow multiple processes to read from the database but
 it will block any processes from opening the database in read-write mode.
 
 ```go
-db, err := bolt.Open("my.db", 0666, &bolt.Options{ReadOnly: true})
+db, err := bolt.Open("my.db", 0600, &bolt.Options{ReadOnly: true})
 if err != nil {
 	log.Fatal(err)
 }
@@ -850,6 +874,12 @@ Here are a few things to note when evaluating and using Bolt:
   to grow. However, it's important to note that deleting large chunks of data
   will not allow you to reclaim that space on disk.
 
+* Removing key/values pairs in a bucket during iteration on the bucket using
+  cursor may not work properly. Each time when removing a key/value pair, the
+  cursor may automatically move to the next position if present. When users
+  call `c.Next()` after removing a key, it may skip one key/value pair.
+  Refer to https://github.com/etcd-io/bbolt/pull/611 for more detailed info.
+
   For more information on page allocation, [see this comment][page-allocation].
 
 [page-allocation]: https://github.com/boltdb/bolt/issues/308#issuecomment-74811638
@@ -919,6 +949,7 @@ Below is a list of public, open source projects that use Bolt:
 * [BoltDbWeb](https://github.com/evnix/boltdbweb) - A web based GUI for BoltDB files.
 * [BoltDB Viewer](https://github.com/zc310/rich_boltdb) - A BoltDB Viewer Can run on Windows、Linux、Android system.
 * [bleve](http://www.blevesearch.com/) - A pure Go search engine similar to ElasticSearch that uses Bolt as the default storage backend.
+* [bstore](https://github.com/mjl-/bstore) - Database library storing Go values, with referential/unique/nonzero constraints, indices, automatic schema management with struct tags, and a query API.
 * [btcwallet](https://github.com/btcsuite/btcwallet) - A bitcoin wallet.
 * [buckets](https://github.com/joyrexus/buckets) - a bolt wrapper streamlining
   simple tx and key scans.
